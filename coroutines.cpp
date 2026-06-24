@@ -9,70 +9,6 @@ namespace mk
 		template<typename t>
 		class generator
 		{
-		public:
-			class promise_type
-			{
-			public:
-				promise_type() noexcept :
-					m_current_value()
-				{
-				}
-				promise_type(mk::lib::generator<t>::promise_type const&) noexcept = delete;
-				promise_type(mk::lib::generator<t>::promise_type&& other) noexcept :
-					m_current_value(std::move(other.m_current_value))
-				{
-				}
-				mk::lib::generator<t>::promise_type& operator=(mk::lib::generator<t>::promise_type const&) noexcept = delete;
-				mk::lib::generator<t>::promise_type& operator=(mk::lib::generator<t>::promise_type&& other) noexcept
-				{
-					m_current_value = std::move(other.m_current_value);
-					return *this;
-				}
-				~promise_type() noexcept
-				{
-				}
-			public:
-				[[nodiscard]] static mk::lib::generator<t> get_return_object_on_allocation_failure(void) noexcept
-				{
-					return mk::lib::generator<t>{nullptr};
-				}
-				[[nodiscard]] mk::lib::generator<t> get_return_object(void) noexcept
-				{
-					return mk::lib::generator<t>{std::coroutine_handle<mk::lib::generator<t>::promise_type>::from_promise(*this)};
-				}
-				[[nodiscard]] std::suspend_always initial_suspend(void) const noexcept
-				{
-					return std::suspend_always{};
-				}
-				[[nodiscard]] std::suspend_always final_suspend(void) const noexcept
-				{
-					return std::suspend_always{};
-				}
-				void unhandled_exception(void) const noexcept
-				{
-					std::terminate();
-				}
-				template<typename u>
-				[[nodiscard]] std::suspend_always yield_value(u&& value) noexcept
-				{
-					m_current_value = std::forward<u>(value);
-					return std::suspend_always{};
-				}
-				void return_void(void) noexcept
-				{
-					m_current_value = t{};
-				}
-				[[nodiscard]] t const& getter(void) const& noexcept
-				{
-					return m_current_value;
-				}
-				[[nodiscard]] t&& getter(void)&& noexcept
-				{
-					return std::move(m_current_value);
-				}
-			private:
-				t m_current_value;
-			};
 		private:
 			generator(void) noexcept = delete;
 			generator(mk::lib::generator<t> const&) noexcept = delete;
@@ -136,6 +72,70 @@ namespace mk
 			{
 				return std::move(m_coroutine_handle.promise()).getter();
 			}
+		public:
+			class promise_type
+			{
+			private:
+				promise_type(mk::lib::generator<t>::promise_type const&) noexcept = delete;
+				mk::lib::generator<t>::promise_type& operator=(mk::lib::generator<t>::promise_type const&) noexcept = delete;
+			public:
+				promise_type() noexcept :
+					m_current_value()
+				{
+				}
+				promise_type(mk::lib::generator<t>::promise_type&& other) noexcept :
+					m_current_value(std::move(other.m_current_value))
+				{
+				}
+				mk::lib::generator<t>::promise_type& operator=(mk::lib::generator<t>::promise_type&& other) noexcept
+				{
+					m_current_value = std::move(other.m_current_value);
+					return *this;
+				}
+				~promise_type() noexcept
+				{
+				}
+			public:
+				[[nodiscard]] static mk::lib::generator<t> get_return_object_on_allocation_failure(void) noexcept
+				{
+					return mk::lib::generator<t>{nullptr};
+				}
+				[[nodiscard]] mk::lib::generator<t> get_return_object(void) noexcept
+				{
+					return mk::lib::generator<t>{std::coroutine_handle<mk::lib::generator<t>::promise_type>::from_promise(*this)};
+				}
+				[[nodiscard]] constexpr std::suspend_always initial_suspend(void) const noexcept
+				{
+					return std::suspend_always{};
+				}
+				[[nodiscard]] constexpr std::suspend_always final_suspend(void) const noexcept
+				{
+					return std::suspend_always{};
+				}
+				[[noreturn]] void unhandled_exception(void) const noexcept
+				{
+					std::terminate();
+				}
+				template<typename u>
+				[[nodiscard]] std::suspend_always yield_value(u&& value) noexcept
+				{
+					m_current_value = std::forward<u>(value);
+					return std::suspend_always{};
+				}
+				void return_void(void) noexcept
+				{
+				}
+				[[nodiscard]] t const& getter(void) const& noexcept
+				{
+					return m_current_value;
+				}
+				[[nodiscard]] t&& getter(void)&& noexcept
+				{
+					return std::move(m_current_value);
+				}
+			private:
+				t m_current_value;
+			};
 		private:
 			std::coroutine_handle<mk::lib::generator<t>::promise_type> m_coroutine_handle;
 		};
