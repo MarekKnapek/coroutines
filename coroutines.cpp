@@ -1,11 +1,55 @@
+#include <cassert> /* assert */
 #include <coroutine> /* std::coroutine_handle std::suspend_always */
+#include <cstddef> /* std::max_align_t */
 #include <exception> /* std::terminate */
+#include <new> /* std::nothrow_t */
 #include <utility> /* std::move std::forward */
 
 namespace mk
 {
 	namespace lib
 	{
+
+		template<typename t>
+		[[nodiscard]] constexpr t round_up(t const& value, t const& align) noexcept
+		{
+			return ((value + (align - 1)) / align) * align;
+		}
+
+		template<std::size_t n>
+		struct storage_t
+		{
+			alignas(alignof(max_align_t)) unsigned char m_buf[n];
+		};
+
+		template<std::size_t n>
+		struct allocator_t
+		{
+			std::size_t m_offset;
+			storage_t<n> m_storage;
+			[[nodiscard]] void* allocate(std::size_t const& len) noexcept
+			{
+				std::size_t amount;
+				unsigned char* ptr;
+				void* ret;
+				assert(len <= n);
+				assert(len <= n - m_offset);
+				amount = round_up(len, alignof(std::max_align_t));
+				assert(amount <= n - m_offset);
+				ptr = &m_storage.m_buf[m_offset];
+				m_offset += amount;
+				ret = ptr;
+				return ret;
+			}
+			void deallocate(void* const& ptr, std::size_t const& len) noexcept
+			{
+				((void)(ptr));
+				((void)(len));
+			}
+		};
+
+		static allocator_t<1 * 1024> g_allocator;
+
 		template<typename t>
 		class generator
 		{
@@ -79,6 +123,19 @@ namespace mk
 				promise_type(mk::lib::generator<t>::promise_type const&) noexcept = delete;
 				mk::lib::generator<t>::promise_type& operator=(mk::lib::generator<t>::promise_type const&) noexcept = delete;
 			public:
+				template<typename... ts>
+				[[nodiscard]] static void* operator new(std::size_t const len, ts&&... args) noexcept
+				{
+					//void* ptr = ::operator new(len, std::nothrow_t{});
+					void* ptr = g_allocator.allocate(len);
+					return ptr;
+				}
+				static void operator delete(void* const ptr, std::size_t const len) noexcept
+				{
+					//::operator delete(ptr, len);
+					g_allocator.deallocate(ptr, len);
+				}
+			public:
 				promise_type() noexcept :
 					m_current_value()
 				{
@@ -122,9 +179,14 @@ namespace mk
 					m_current_value = std::forward<u>(value);
 					return std::suspend_always{};
 				}
-				void return_void(void) noexcept
+				template<typename u>
+				void return_value(u&& value) noexcept
 				{
+					m_current_value = std::forward<u>(value);
 				}
+				/*void return_void(void) noexcept
+				{
+				}*/
 				[[nodiscard]] t const& getter(void) const& noexcept
 				{
 					return m_current_value;
@@ -139,6 +201,7 @@ namespace mk
 		private:
 			std::coroutine_handle<mk::lib::generator<t>::promise_type> m_coroutine_handle;
 		};
+
 	}
 }
 
@@ -154,6 +217,7 @@ namespace mk
 			{
 				co_yield std::string(20, filler) + std::to_string(i);
 			}
+			co_return "=== done ===";
 		}
 	}
 }
